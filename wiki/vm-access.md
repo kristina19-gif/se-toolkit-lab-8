@@ -51,7 +51,7 @@ Complete these steps:
 6. [Set up the `SSH` key authentication for the user `<user>` (REMOTE)](#set-up-the-ssh-key-authentication-for-the-user-user-remote).
 7. [Update the `SSH` config (LOCAL)](#update-the-ssh-config-local).
 8. [Connect to the VM as the user `<user>` (LOCAL)](#connect-to-the-vm-as-the-user-user-local).
-9. [Harden the `SSH` connection](#harden-the-ssh-connection).
+9. [Restrict the `SSH` connection](#restrict-the-ssh-connection).
 
 ## Set up `SSH` (LOCAL)
 
