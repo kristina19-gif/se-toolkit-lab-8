@@ -2,7 +2,7 @@
 
 import traceback
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -19,7 +19,7 @@ app = FastAPI(
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(exc: Exception):
     """Return error details in the response for easier debugging."""
     tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
     return JSONResponse(
