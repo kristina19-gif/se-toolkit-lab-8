@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from mcp_lms.client import LMSClient
 
 _base_url: str = ""
+_logs_url: str = ""
+_traces_url: str = ""
 
 server = Server("lms")
 
@@ -38,6 +40,63 @@ class _TopLearnersQuery(_LabQuery):
     )
 
 
+class _LogsSearchQuery(BaseModel):
+    keyword: str = Field(
+        default="",
+        description="Optional keyword or phrase to search for in log messages.",
+    )
+    service: str = Field(
+        default="",
+        description="Optional service name filter, e.g. 'Learning Management Service'.",
+    )
+    level: str = Field(
+        default="",
+        description="Optional severity filter such as 'INFO' or 'ERROR'.",
+    )
+    minutes: int = Field(
+        default=60,
+        ge=1,
+        le=10080,
+        description="Search window in minutes counting back from now.",
+    )
+    limit: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum number of log entries to return.",
+    )
+
+
+class _LogsErrorCountQuery(BaseModel):
+    minutes: int = Field(
+        default=60,
+        ge=1,
+        le=10080,
+        description="Time window in minutes counting back from now.",
+    )
+    service: str = Field(default="", description="Optional service name filter.")
+
+
+class _TracesListQuery(BaseModel):
+    service: str = Field(description="Service name to search traces for.")
+    minutes: int = Field(
+        default=60,
+        ge=1,
+        le=10080,
+        description="Time window in minutes counting back from now.",
+    )
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum number of traces to return.",
+    )
+
+
+class _TraceGetQuery(BaseModel):
+    trace_id: str = Field(description="Trace ID returned by logs or traces_list.")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -58,7 +117,12 @@ def _client() -> LMSClient:
         raise RuntimeError(
             "LMS backend URL not configured. Pass it as: python -m mcp_lms <base_url>"
         )
-    return LMSClient(_base_url, _resolve_api_key())
+    return LMSClient(
+        _base_url,
+        _resolve_api_key(),
+        logs_url=_logs_url,
+        traces_url=_traces_url,
+    )
 
 
 def _text(data: BaseModel | Sequence[BaseModel]) -> list[TextContent]:
@@ -110,6 +174,41 @@ async def _completion_rate(args: _LabQuery) -> list[TextContent]:
 
 async def _sync_pipeline(_args: _NoArgs) -> list[TextContent]:
     return _text(await _client().sync_pipeline())
+
+
+async def _logs_search(args: _LogsSearchQuery) -> list[TextContent]:
+    return _text(
+        await _client().logs_search(
+            keyword=args.keyword,
+            service=args.service,
+            level=args.level,
+            minutes=args.minutes,
+            limit=args.limit,
+        )
+    )
+
+
+async def _logs_error_count(args: _LogsErrorCountQuery) -> list[TextContent]:
+    return _text(
+        await _client().logs_error_count(
+            minutes=args.minutes,
+            service=args.service,
+        )
+    )
+
+
+async def _traces_list(args: _TracesListQuery) -> list[TextContent]:
+    return _text(
+        await _client().traces_list(
+            service=args.service,
+            minutes=args.minutes,
+            limit=args.limit,
+        )
+    )
+
+
+async def _traces_get(args: _TraceGetQuery) -> list[TextContent]:
+    return _text(await _client().traces_get(args.trace_id))
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +283,30 @@ _register(
     _NoArgs,
     _sync_pipeline,
 )
+_register(
+    "logs_search",
+    "Search VictoriaLogs by keyword, service, severity, and recent time window.",
+    _LogsSearchQuery,
+    _logs_search,
+)
+_register(
+    "logs_error_count",
+    "Count recent ERROR log events per service from VictoriaLogs.",
+    _LogsErrorCountQuery,
+    _logs_error_count,
+)
+_register(
+    "traces_list",
+    "List recent traces for a service from VictoriaTraces.",
+    _TracesListQuery,
+    _traces_list,
+)
+_register(
+    "traces_get",
+    "Fetch a specific trace by trace ID from VictoriaTraces.",
+    _TraceGetQuery,
+    _traces_get,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -216,8 +339,10 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
 
 
 async def main(base_url: str | None = None) -> None:
-    global _base_url
+    global _base_url, _logs_url, _traces_url
     _base_url = base_url or os.environ.get("NANOBOT_LMS_BACKEND_URL", "")
+    _logs_url = os.environ.get("NANOBOT_LOGS_BASE_URL", "")
+    _traces_url = os.environ.get("NANOBOT_TRACES_BASE_URL", "")
     async with stdio_server() as (read_stream, write_stream):
         init_options = server.create_initialization_options()
         await server.run(read_stream, write_stream, init_options)
