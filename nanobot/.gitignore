@@ -1,0 +1,10 @@
+.venv/
+cron/
+workspace/AGENTS.md
+workspace/HEARTBEAT.md
+workspace/SOUL.md
+workspace/TOOLS.md
+workspace/USER.md
+workspace/memory/
+workspace/sessions/
+config.resolved.json
